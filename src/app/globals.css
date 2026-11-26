@@ -1,0 +1,112 @@
+@import "tailwindcss";
+
+@theme {
+  /* Brand — Car Detailing Studio: deep black + red accent */
+  --color-brand-dark: #F5F5F5;
+  --color-brand-brown: #DC2626;
+  --color-brand-copper: #B91C1C;
+  --color-brand-gold: #EF4444;
+  --color-brand-beige: #1A1A1A;
+  --color-brand-beige-dark: #262626;
+  --color-brand-white: #FFFFFF;
+  --color-brand-muted: #9CA3AF;
+  --color-brand-border: #2A2A2A;
+  --color-brand-placeholder: #6B7280;
+
+  /* Semantic tokens */
+  --color-background: #0E0E0E;
+  --color-surface: #1A1A1A;
+  --color-border: #282828;
+  --color-border-strong: #333333;
+  --color-text-primary: #0A0A0A;
+  --color-text-secondary: #374151;
+  --color-text-muted: #6B7280;
+  --color-text-placeholder: #9CA3AF;
+
+  /* Status colors */
+  --color-status-draft-bg: #F3F4F6;
+  --color-status-draft-text: #6B7280;
+  --color-status-sent-bg: #FEF2F2;
+  --color-status-sent-text: #991B1B;
+  --color-status-accepted-bg: #ECFDF5;
+  --color-status-accepted-text: #065F46;
+  --color-status-rejected-bg: #F3F4F6;
+  --color-status-rejected-text: #6B7280;
+  --color-status-expired-bg: #F3F4F6;
+  --color-status-expired-text: #6B7280;
+  --color-status-paid-bg: #ECFDF5;
+  --color-status-paid-text: #065F46;
+  --color-status-pending-bg: #FEF2F2;
+  --color-status-pending-text: #991B1B;
+  --color-status-partial-bg: #FFF7ED;
+  --color-status-partial-text: #9A3412;
+  --color-status-overdue-bg: #FEF2F2;
+  --color-status-overdue-text: #991B1B;
+
+  /* Font */
+  --font-sans: var(--font-lexend), 'Helvetica Neue', Helvetica, Arial, sans-serif;
+
+  /* Radius */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  /* Shadows */
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.05);
+  --shadow-dropdown: 0 8px 24px -4px rgba(0,0,0,0.12), 0 2px 8px -2px rgba(0,0,0,0.06);
+  --shadow-modal: 0 20px 48px -8px rgba(0,0,0,0.20);
+}
+
+* { box-sizing: border-box; }
+html { height: 100%; }
+
+body {
+  background-color: #0E0E0E;
+  color: #F5F5F5;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+  min-height: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4 {
+  letter-spacing: -0.02em;
+  font-weight: 600;
+}
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #D1D5DB; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #9CA3AF; }
+
+:focus-visible { outline: 2px solid #DC2626; outline-offset: 2px; }
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+input[type="number"] { -moz-appearance: textfield; }
+
+@media print { .no-print { display: none !important; } }
+
+/* ── Dark theme: override Tailwind utility classes ── */
+.bg-white          { background-color: #1A1A1A; }
+.bg-gray-50        { background-color: #141414; }
+.bg-gray-100       { background-color: #1F1F1F; }
+.text-gray-900     { color: #F5F5F5; }
+.text-gray-800     { color: #E0E0E0; }
+.text-gray-700     { color: #CBCBCB; }
+.text-gray-600     { color: #A0A0A0; }
+.text-gray-500     { color: #808080; }
+.text-gray-400     { color: #666666; }
+.border-gray-200   { border-color: #2A2A2A; }
+.border-gray-100   { border-color: #222222; }
+.divide-gray-100 > * + * { border-color: #222222; }
+.divide-y > * + * { border-color: #242424; }
+.divide-brand-border > * { border-color: #242424; }
+.hover\:bg-gray-50:hover  { background-color: #1F1F1F; }
+.hover\:bg-gray-100:hover { background-color: #252525; }
+.hover\:bg-brand-beige:hover { background-color: #1F1F1F; }
+.bg-surface { background-color: #1A1A1A; }

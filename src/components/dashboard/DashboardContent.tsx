@@ -1,0 +1,365 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import { FileText, Receipt, TrendingUp, Clock, ChevronRight, Plus, ArrowUpRight } from "lucide-react";
+import { formatCurrency, formatDate } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { PaymentStatusBadge } from "@/components/ui/badge";
+import { Invoice } from "@/types";
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addWeeks, subMonths } from "date-fns";
+import { createClient } from "@/lib/supabase/client";
+
+interface Stats {
+  total_quotations: number;
+  total_invoices: number;
+  month_billing: number;
+  pending_payments: number;
+}
+
+interface WeekSummary {
+  label: string;
+  count: number;
+  total: number;
+  from: string;
+  to: string;
+}
+
+interface DashboardContentProps {
+  stats: Stats;
+  userId: string;
+}
+
+type PeriodKey = "today" | "this_week" | "this_month" | "last_month" | "custom";
+
+const PERIODS: { label: string; value: PeriodKey }[] = [
+  { label: "Today", value: "today" },
+  { label: "This Week", value: "this_week" },
+  { label: "This Month", value: "this_month" },
+  { label: "Last Month", value: "last_month" },
+  { label: "Custom", value: "custom" },
+];
+
+function getPeriodDates(period: Exclude<PeriodKey, "custom">) {
+  const now = new Date();
+  switch (period) {
+    case "today":
+      return { from: format(now, "yyyy-MM-dd"), to: format(now, "yyyy-MM-dd") };
+    case "this_week": {
+      const ws = startOfWeek(now, { weekStartsOn: 1 });
+      const we = endOfWeek(now, { weekStartsOn: 1 });
+      return { from: format(ws, "yyyy-MM-dd"), to: format(we, "yyyy-MM-dd") };
+    }
+    case "this_month":
+      return { from: format(startOfMonth(now), "yyyy-MM-dd"), to: format(endOfMonth(now), "yyyy-MM-dd") };
+    case "last_month": {
+      const lm = subMonths(now, 1);
+      return { from: format(startOfMonth(lm), "yyyy-MM-dd"), to: format(endOfMonth(lm), "yyyy-MM-dd") };
+    }
+  }
+}
+
+export function DashboardContent({ stats, userId }: DashboardContentProps) {
+  const [period, setPeriod] = useState<PeriodKey>("this_month");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [weeks, setWeeks] = useState<WeekSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedWeek, setSelectedWeek] = useState<string | null>(null);
+  const [weekInvoices, setWeekInvoices] = useState<Invoice[]>([]);
+
+  const now = new Date();
+  const hour = now.getHours();
+  const greeting = hour < 12 ? "Good Morning" : hour < 17 ? "Good Afternoon" : "Good Evening";
+
+  useEffect(() => {
+    if (period === "custom") {
+      if (customFrom && customTo && customFrom <= customTo) fetchPeriodData();
+    } else {
+      fetchPeriodData();
+    }
+  }, [period, customFrom, customTo]);
+
+  async function fetchPeriodData() {
+    if (!userId) return;
+    setLoading(true);
+    setSelectedWeek(null);
+    try {
+      const { from, to } = period === "custom"
+        ? { from: customFrom, to: customTo }
+        : getPeriodDates(period as Exclude<PeriodKey, "custom">);
+
+      const supabase = createClient();
+      const { data } = await supabase
+        .from("invoices")
+        .select("*, customers(id, name)")
+        .eq("user_id", userId)
+        .gte("date", from)
+        .lte("date", to)
+        .order("date", { ascending: true });
+
+      const list = (data as any[]) ?? [];
+      setInvoices(list);
+
+      const weekMap = new Map<string, WeekSummary>();
+      list.forEach((inv) => {
+        const d = new Date(inv.date);
+        const ws = format(startOfWeek(d, { weekStartsOn: 1 }), "yyyy-MM-dd");
+        const we = format(endOfWeek(d, { weekStartsOn: 1 }), "yyyy-MM-dd");
+        const label = `${format(new Date(ws), "d MMM")} – ${format(new Date(we), "d MMM")}`;
+        if (!weekMap.has(ws)) weekMap.set(ws, { label, count: 0, total: 0, from: ws, to: we });
+        const w = weekMap.get(ws)!;
+        w.count++;
+        w.total += Number(inv.grand_total);
+      });
+      setWeeks(Array.from(weekMap.values()));
+    } catch {}
+    setLoading(false);
+  }
+
+  function handleWeekClick(week: WeekSummary) {
+    if (selectedWeek === week.label) { setSelectedWeek(null); setWeekInvoices([]); return; }
+    setSelectedWeek(week.label);
+    setWeekInvoices(invoices.filter(inv => inv.date >= week.from && inv.date <= week.to));
+  }
+
+  const periodStats = {
+    count: invoices.length,
+    total: invoices.reduce((s, i) => s + Number(i.grand_total), 0),
+    paid: invoices.filter(i => i.payment_status === "paid").reduce((s, i) => s + Number(i.grand_total), 0),
+    pending: invoices.filter(i => i.payment_status !== "paid").reduce((s, i) => s + Number(i.balance_due), 0),
+  };
+
+  const displayInvoices = selectedWeek ? weekInvoices : invoices;
+
+  return (
+    <div className="px-4 lg:px-8 py-6 max-w-5xl mx-auto w-full space-y-5">
+
+      {/* Greeting */}
+      <div className="pt-1">
+        <p style={{ fontSize: 12, fontWeight: 500, color: "#6B7280", letterSpacing: "0.02em" }}>{greeting}</p>
+        <h2 style={{ fontSize: 20, fontWeight: 600, color: "#F5F5F5", letterSpacing: "-0.02em", lineHeight: 1.2, marginTop: 2 }}>Shiv Car Detailing Studio</h2>
+      </div>
+
+      {/* Summary Cards — no borders, shadow only */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <StatCard icon={<FileText className="h-4 w-4" />} label="Quotations" value={stats.total_quotations.toString()} href="/quotations" color="#DC2626" bg="rgba(220,38,38,0.12)" />
+        <StatCard icon={<Receipt className="h-4 w-4" />} label="Invoices" value={stats.total_invoices.toString()} href="/invoices" color="#DC2626" bg="rgba(220,38,38,0.12)" />
+        <StatCard icon={<TrendingUp className="h-4 w-4" />} label="This Month" value={formatCurrency(stats.month_billing)} href="/invoices" color="#059669" bg="#ECFDF5" />
+        <StatCard icon={<Clock className="h-4 w-4" />} label="Pending" value={formatCurrency(stats.pending_payments)} href="/payments" color="#D97706" bg="#FFFBEB" />
+      </div>
+
+      {/* Quick Actions */}
+      <div className="flex gap-2.5 flex-wrap">
+        <Link href="/quotations/new">
+          <Button variant="primary" size="md"><Plus className="h-4 w-4" />New Quotation</Button>
+        </Link>
+        <Link href="/invoices/new">
+          <Button variant="secondary" size="md"><Plus className="h-4 w-4" />New Invoice</Button>
+        </Link>
+      </div>
+
+      {/* Invoice Activity — clean card, no border */}
+      <div style={{ background: "#1A1A1A", borderRadius: 12, border: "1px solid #282828", overflow: "hidden" }}>
+
+        {/* Header row */}
+        <div style={{ padding: "14px 20px", borderBottom: "1px solid #282828" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+            <p style={{ fontSize: 14, fontWeight: 600, color: "#F5F5F5", letterSpacing: "-0.01em" }}>Invoice Activity</p>
+            {/* Period tabs */}
+            <div style={{ display: "flex", gap: 2, background: "#252525", borderRadius: 8, padding: 3, overflowX: "auto", scrollbarWidth: "none" as any }}>
+              {PERIODS.map(p => (
+                <button
+                  key={p.value}
+                  onClick={() => setPeriod(p.value)}
+                  style={{
+                    padding: "5px 10px",
+                    borderRadius: 8,
+                    fontSize: 11.5,
+                    fontWeight: 600,
+                    whiteSpace: "nowrap" as any,
+                    border: "none",
+                    cursor: "pointer",
+                    transition: "all 0.15s",
+                    background: period === p.value ? "#DC2626" : "transparent",
+                    color: period === p.value ? "#fff" : "#6B7280",
+                    boxShadow: "none",
+                  }}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {/* Custom date inputs — shown only when Custom is selected */}
+          {period === "custom" && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <label style={{ fontSize: 11, fontWeight: 500, color: "#9CA3AF" }}>From</label>
+                <input
+                  type="date"
+                  value={customFrom}
+                  max={customTo || undefined}
+                  onChange={e => setCustomFrom(e.target.value)}
+                  style={{
+                    height: 32, borderRadius: 6, border: "1px solid #333333",
+                    padding: "0 8px", fontSize: 12, color: "#F5F5F5",
+                    background: "#252525", outline: "none",
+                  }}
+                />
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <label style={{ fontSize: 11, fontWeight: 500, color: "#6B7280" }}>To</label>
+                <input
+                  type="date"
+                  value={customTo}
+                  min={customFrom || undefined}
+                  onChange={e => setCustomTo(e.target.value)}
+                  style={{
+                    height: 32, borderRadius: 6, border: "1px solid #333333",
+                    padding: "0 8px", fontSize: 12, color: "#F5F5F5",
+                    background: "#252525", outline: "none",
+                  }}
+                />
+              </div>
+              {customFrom && customTo && (
+                <span style={{ fontSize: 11, color: "#9CA3AF" }}>
+                  {invoices.length} invoice{invoices.length !== 1 ? "s" : ""} found
+                </span>
+              )}
+              {customFrom && customTo && customFrom > customTo && (
+                <span style={{ fontSize: 11, color: "#DC2626" }}>Start date must be before end date</span>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Period Stats — 4 pills in a row */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 0, padding: "12px 16px", borderBottom: "1px solid #282828" }}>
+          <MiniStat label="Invoices" value={periodStats.count.toString()} />
+          <MiniStat label="Total Billed" value={formatCurrency(periodStats.total)} accent />
+          <MiniStat label="Collected" value={formatCurrency(periodStats.paid)} green />
+          <MiniStat label="Outstanding" value={formatCurrency(periodStats.pending)} warn />
+        </div>
+
+        {/* Weekly breakdown */}
+        {weeks.length > 0 && (
+          <div style={{ padding: "12px 16px", borderBottom: "1px solid #282828" }}>
+            <p style={{ fontSize: 10, fontWeight: 600, color: "#6B7280", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 }}>Weekly Breakdown</p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 6 }} className="sm:grid-cols-4" >
+              {weeks.map(week => (
+                <button
+                  key={week.label}
+                  onClick={() => handleWeekClick(week)}
+                  style={{
+                    textAlign: "left",
+                    padding: "10px 12px",
+                    borderRadius: 10,
+                    border: "none",
+                    cursor: "pointer",
+                    transition: "all 0.15s",
+                    background: selectedWeek === week.label ? "rgba(220,38,38,0.15)" : "#252525",
+                    boxShadow: selectedWeek === week.label ? "inset 0 0 0 1.5px #DC2626" : "none",
+                  }}
+                >
+                  <p style={{ fontSize: 10, fontWeight: 600, color: "#6B7280" }}>{week.label}</p>
+                  <p style={{ fontSize: 13, fontWeight: 700, color: "#F5F5F5", marginTop: 2 }}>{week.count} invoices</p>
+                  <p style={{ fontSize: 11, color: "#DC2626", fontWeight: 600, marginTop: 1 }}>{formatCurrency(week.total)}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Invoice list */}
+        <div>
+          {loading ? (
+            <div style={{ padding: "40px 0", textAlign: "center", fontSize: 13, color: "#9CA3AF" }}>Loading…</div>
+          ) : displayInvoices.length === 0 ? (
+            <div style={{ padding: "40px 0", textAlign: "center" }}>
+              <p style={{ fontSize: 13, color: "#D1D5DB" }}>No invoices in this period</p>
+            </div>
+          ) : (
+            displayInvoices.slice(0, 8).map((inv, i) => (
+              <Link key={inv.id} href={`/invoices/${inv.id}`}
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  padding: "12px 20px",
+                  borderTop: i === 0 ? "none" : "1px solid #242424",
+                  transition: "background 0.12s",
+                  textDecoration: "none",
+                }}
+                onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "#242424"}
+                onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "transparent"}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 8, background: "rgba(220,38,38,0.12)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <Receipt style={{ width: 13, height: 13, color: "#DC2626" }} />
+                  </div>
+                  <div style={{ minWidth: 0 }}>
+                    <p style={{ fontSize: 13, fontWeight: 600, color: "#F5F5F5", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{inv.invoice_number}</p>
+                    <p style={{ fontSize: 11.5, color: "#6B7280", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {(inv.customers as any)?.name ?? ""} · {formatDate(inv.date)}
+                    </p>
+                  </div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0, marginLeft: 8 }}>
+                  <div style={{ textAlign: "right" }}>
+                    <p style={{ fontSize: 13, fontWeight: 700, color: "#F5F5F5" }}>{formatCurrency(Number(inv.grand_total))}</p>
+                    <PaymentStatusBadge status={inv.payment_status} />
+                  </div>
+                  <ArrowUpRight style={{ width: 13, height: 13, color: "#D1D5DB" }} className="hidden lg:block" />
+                </div>
+              </Link>
+            ))
+          )}
+        </div>
+
+        {!loading && invoices.length > 8 && (
+          <div style={{ padding: "12px 20px", borderTop: "1px solid #282828", textAlign: "center" }}>
+            <Link href="/invoices" style={{ fontSize: 12.5, color: "#DC2626", fontWeight: 600, textDecoration: "none" }}>
+              View all {invoices.length} invoices →
+            </Link>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function StatCard({ icon, label, value, href, color, bg }: {
+  icon: React.ReactNode; label: string; value: string; href: string; color: string; bg: string;
+}) {
+  return (
+    <Link href={href} style={{ display: "block", textDecoration: "none" }}>
+      <div
+        style={{
+          background: "#1A1A1A",
+          borderRadius: 12,
+          padding: "16px 16px 14px",
+          border: "1px solid #282828",
+          transition: "background 0.1s",
+        }}
+        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "#242424"; }}
+        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "#1A1A1A"; }}
+      >
+        <div style={{ width: 32, height: 32, borderRadius: 8, background: bg, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 12, color }}>
+          {icon}
+        </div>
+        <p style={{ fontSize: 11, fontWeight: 500, color: "#6B7280", letterSpacing: "0.01em" }}>{label}</p>
+        <p style={{ fontSize: 20, fontWeight: 700, color: "#F5F5F5", letterSpacing: "-0.03em", marginTop: 2, lineHeight: 1.1 }}>{value}</p>
+      </div>
+    </Link>
+  );
+}
+
+function MiniStat({ label, value, accent, green, warn }: { label: string; value: string; accent?: boolean; green?: boolean; warn?: boolean }) {
+  const color = green ? "#34D399" : warn ? "#FBBF24" : accent ? "#DC2626" : "#F5F5F5";
+  return (
+    <div style={{ padding: "6px 8px" }}>
+      <p style={{ fontSize: 10.5, color: "#6B7280", fontWeight: 500 }}>{label}</p>
+      <p style={{ fontSize: 15, fontWeight: 700, color, letterSpacing: "-0.02em", marginTop: 1 }}>{value}</p>
+    </div>
+  );
+}
