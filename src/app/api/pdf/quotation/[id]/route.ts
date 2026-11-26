@@ -40,7 +40,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       }) as any
     );
 
-    return new NextResponse(buffer as unknown as Uint8Array, {
+    return new NextResponse(new Blob([buffer], { type: "application/pdf" }), {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `inline; filename="${qtnRes.data.quotation_number}.pdf"`,
