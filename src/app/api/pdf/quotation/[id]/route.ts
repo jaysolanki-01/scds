@@ -37,10 +37,10 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
         company: compRes.data,
         docSettings: dsRes.data,
         logoBase64,
-      })
+      }) as any
     );
 
-    return new NextResponse(buffer, {
+    return new NextResponse(buffer as unknown as Uint8Array, {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `inline; filename="${qtnRes.data.quotation_number}.pdf"`,

@@ -41,7 +41,7 @@ export function QuotationDetailContent({ quotation: initial, company, docSetting
     setConverting(true);
     try {
       const supabase = createClient();
-      const dsRes = await supabase.from("doc_settings").select("inv_prefix, inv_next_number").eq("user_id", userId).maybeSingle();
+      const dsRes = await supabase.from("doc_settings").select("inv_prefix, inv_next_number, inv_payment_days").eq("user_id", userId).maybeSingle();
       const prefix = dsRes.data?.inv_prefix ?? "INV";
       const nextNum = dsRes.data?.inv_next_number ?? 1;
       const invoice_number = `${prefix}-${String(nextNum).padStart(4, "0")}`;

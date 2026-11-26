@@ -26,8 +26,8 @@ export default async function CustomerProfilePage({ params }: { params: Promise<
         <Header title={custRes.data.name} />
         <CustomerProfileContent
           customer={custRes.data}
-          quotations={qtnRes.data ?? []}
-          invoices={invRes.data ?? []}
+          quotations={(qtnRes.data ?? []) as any[]}
+          invoices={(invRes.data ?? []) as any[]}
           userId={userId}
         />
       </div>
