@@ -40,7 +40,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       }) as any
     );
 
-    return new NextResponse(new Blob([buffer], { type: "application/pdf" }), {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return new NextResponse(buffer as any, {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `inline; filename="${invRes.data.invoice_number}.pdf"`,
